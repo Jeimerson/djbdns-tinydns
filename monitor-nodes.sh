@@ -44,7 +44,9 @@ done
 NUM_DOWN=`echo $DOWN_NODES | wc -w`
 if [ $NUM_DOWN -eq $MAX_NODES ]
 then
-  echo "ERROR: All nodes are down."  | mail -s "all nodes are down" $ADMIN_MAIL exit 1
+  echo "ERROR: All nodes are down."  | \
+      mail -s "FATAL: all nodes are down" $ADMIN_MAIL 
+  exit 1
 fi
 
 #
@@ -81,5 +83,6 @@ fi
 
 echo $DOWN_NODES > $DOWN_NODES_FILE
 
+# update DNS
 make
 
