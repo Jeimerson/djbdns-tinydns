@@ -19,7 +19,7 @@ NODES="192.168.1.60 192.168.1.61 192.168.1.62"
 ADMIN_MAIL="root"
 
 # The check script that is called to see if a node is functional or not.
-CHECK_SCRIPT="index.html"
+CHECK_SCRIPT="checkserver.php"
 
 
 DOWN_NODES_FILE="${TINYDNS}/nodes-down.txt"
