@@ -8,24 +8,25 @@
 # NOTES:
 #    http://www.atrixnet.com/load-balancing-with-round-robin-dns/
 #
-# BY: Danny Sheehan   http://www.setuptips.com
+# BY: Danny Sheehan   http://www.ftmon.org
 # -------------------------------------------------------------------
 TINYDNS="/etc/service/tinydns/root"
 
 # Update this with the IP address of the nodes in your cluster.
-# Or export as environment variables.
-if [ -z "$NODES" ]
-then
-  NODES="192.168.1.2 192.168.1.3 192.168.1.1"
-fi
-
-THIS_HOST=`uname -n`
+NODES="192.168.1.11 192.168.1.12 102.168.1.13"
 
 # The person who gets email when things go wrong.
-ADMIN_MAIL="pager"
+ADMIN_MAIL="root"
 
 # The check script that is called to see if a node is functional or not.
 CHECK_SCRIPT="checkserver.php"
+
+# You can keep the above configuration variables organized in a config file.
+CONFIG="/etc/default/ftmoncluster"
+test -r $CONFIG && . $CONFIG
+
+
+THIS_HOST=`uname -n`
 
 
 DOWN_NODES_FILE="${TINYDNS}/nodes-down.txt"
@@ -42,13 +43,15 @@ PREV_DOWN=`cat $DOWN_NODES_FILE`
 DOWN_NODES=""
 for n in `echo $NODES`
 do
-   if ! wget -t 2 -q  --spider http://$n/${CHECK_SCRIPT} > /dev/null
+   if ! wget -T 4 -t 2 -q  --spider http://$n/${CHECK_SCRIPT} > /dev/null
    then
      DOWN_NODES="$DOWN_NODES $n"
    fi
 done
 
-
+#
+# Don't do anything if all nodes are down.
+#
 NUM_DOWN=`echo $DOWN_NODES | wc -w`
 if [ $NUM_DOWN -eq $MAX_NODES ]
 then
@@ -89,7 +92,7 @@ fi
 PREV_NUM_DOWN=`echo $PREV_DOWN | wc -w`
 
 #
-# Re-activate nodes that were down in DNS but are back up.
+# Re-activate nodes that were down in DNS but are now back up.
 #
 if [ $PREV_NUM_DOWN -gt 0 ]
 then
@@ -106,11 +109,14 @@ fi
 
 echo $DOWN_NODES > $DOWN_NODES_FILE
 
-#
-# start mysql if it is down.
-#
-if ! pgrep -u mysql > /dev/null
+if [ -e "/etc/init.d/mysql" ]
 then
-  echo "mysql is down - restarting." | mail -s "$THIS_HOST : Starting mysql" $ADMIN_MAIL
- service mysql start
-fi 
+  #
+  # start mysql if it is down.
+  #
+  if ! pgrep -u mysql > /dev/null
+  then
+    echo "mysql is down - restarting." | mail -s "$THIS_HOST : Starting mysql" $ADMIN_MAIL
+   service mysql start
+  fi 
+fi
