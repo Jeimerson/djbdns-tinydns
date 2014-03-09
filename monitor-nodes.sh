@@ -76,7 +76,7 @@ then
       mv $DATA $DATA.bak
       sed -e "s/^\+\([0-9a-zA-Z\-\.]*\):${n}:\([0-9]*\)$/\-\1:${n}:\2/" $DATA.bak > $DATA
       # update DNS
-      make
+      make data.cdb
     else
       echo "$HOST_NAME is down." | \
                   mail -s "$THIS_HOST : $HOST_NAME down for 1 count" $ADMIN_MAIL
@@ -100,7 +100,7 @@ then
     mv $DATA $DATA.bak1
     sed -e "s/^\-\([0-9a-zA-Z\-\.]*\):${n}:\([0-9]*\)$/\+\1:${n}:\2/" $DATA.bak1 > $DATA
     # update DNS
-    make
+    make data.cdb
   done
 fi
 
