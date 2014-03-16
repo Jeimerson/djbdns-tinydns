@@ -14,14 +14,27 @@ TINYDNS="/etc/service/tinydns/root"
 
 # Update this with the IP address of the nodes in your cluster.
 FT_NODES_ADDR="10.0.0.22 10.0.0.23 10.0.0.24"
+#
 # Set to the hostname of you master node as returned by 'uname -n'
 FT_MASTER_HOST="ns1"
+#
 # These are a-records that you never want to disable.
+# For example if you setup your own DNS servers and these are the a-records of
+# those servers.
 FT_DNS_EXCEPTIONS="ns1.yourdomain.com ns2.yourdomain.com ns3.yourdomain.com"
-# The person who gets email when things go wrong.
-FT_ADMIN="pager"
+#
+# The user designated as the administrator.
+# Be sure to setup a /etc/aliases entry.
+FT_ADMIN="trump24"
+#
+# Where serious alerts get sent.
+# Be sure to setup a /etc/aliases entry.
+FT_PAGER="pager"
+#
 # The check script that is called to see if a node is functional or not.
 # must be on your webserver. Can be in hidden path.
+# I suggest you use
+# https://github.com/dannysheehan/djbdns-tinydns/blob/master/checkserver.php
 FT_CHECK_PAGE="checkserver.php"
 
 
@@ -38,12 +51,21 @@ touch ${DOWN_NODES_FILE}
 
 DATA="${TINYDNS}/data"
 
+# not much point trying to recover if we lost our network conectivity.
+if ! nc -z google.com 80 
+then
+  exit 1
+fi
+
 cd $TINYDNS
 
 MAX_NODES=`echo $FT_NODES_ADDR | wc -w`
 
 PREV_DOWN=`cat $DOWN_NODES_FILE`
 
+#
+# First, we find out how many of our cluster nodes are down.
+#
 DOWN_NODES=""
 for n in `echo $FT_NODES_ADDR`
 do
@@ -51,6 +73,7 @@ do
    then
      DOWN_NODES="$DOWN_NODES $n"
    fi
+
 done
 
 #
@@ -61,7 +84,8 @@ if [ $NUM_DOWN -eq $MAX_NODES ]
 then
   echo "ERROR: All nodes are down."
   echo "ERROR: All nodes are down."  | \
-      mail -s "$THIS_HOST: FATAL: all nodes are down" $FT_ADMIN 
+      mail -s "$THIS_HOST: FATAL: all nodes are down" $FT_PAGER 
+
 
   if [ ! -e "/etc/init.d/mysql" ]
   then
@@ -69,7 +93,7 @@ then
   fi
 
   # try a limited bootstrap in the event that mysql totally shuts down
-  # but just on the master node.
+  # but just on the node we designate as the "master node".
   if [ "$THIS_HOST" = "$FT_MASTER_HOST" ]
   then 
     if ! ps -fu mysql > /dev/null
@@ -83,7 +107,7 @@ then
 fi
 
 #
-# De-activate nodes that are down in DNS
+# De-activate round robin DNS records of nodes that are down.
 #
 if [ $NUM_DOWN -gt 0 ]
 then
@@ -104,8 +128,8 @@ then
       cat $DATA.bak | while read DRECORD
       do
 
-        # Deactivate A records for the down server/s.
-        # Except for A records that are exceptions. e.g. dns server a-records
+        # Deactivate A records for the down server/'s.
+        # Except for A records that are designated as exceptions. e.g. dns server a-records
         if echo $DRECORD | egrep -q "^\+" 
         then
           HNAME=`echo $DRECORD | cut -d: -f1 | sed -e "s/\+//"` 
@@ -119,8 +143,10 @@ then
           echo $DRECORD
         fi
       done  > $DATA
-      # update DNS
+
+      # update DNS records.
       make data.cdb
+
     else
       echo "$HOST_NAME is down."
       echo "$HOST_NAME is down." | \
@@ -134,7 +160,7 @@ fi
 PREV_NUM_DOWN=`echo $PREV_DOWN | wc -w`
 
 #
-# Re-activate nodes that were down in DNS but are back up.
+# Re-activate round robin DNS records of nodes that were down but are now back up.
 #
 if [ $PREV_NUM_DOWN -gt 0 ]
 then
@@ -143,7 +169,7 @@ then
     HOST_NAME=`getent hosts $n | awk '{print $2}'`
     echo "putting $HOST_NAME back in service."
     echo "putting $HOST_NAME back in service." | \
-       mail -s "$THIS_HOST : $HOST_NAME up" $FT_ADMIN
+       mail -s "$THIS_HOST : $HOST_NAME up" $FT_PAGER
     mv $DATA $DATA.bak1
     sed -e "s/^\-\([0-9a-zA-Z\-\.]*\):${n}\(.*\)$/\+\1:${n}\2/" $DATA.bak1 > $DATA
     # update DNS
@@ -155,7 +181,7 @@ echo $DOWN_NODES > $DOWN_NODES_FILE
 
 #
 # If msql server is down, try restarting it.
-# oom-killer may have killed it.
+# oom-killer most likely killed it.
 #
 if [ -e "/etc/init.d/mysql" ]
 then
